@@ -1,0 +1,55 @@
+---
+title: "DELETE /channels — Leave a Telegram Channel"
+sidebarTitle: "DELETE /channels"
+description: "DELETE /channels — leaves a Telegram channel by username using LeaveChannelRequest. Returns 204 No Content on success."
+---
+
+This endpoint sends a [`LeaveChannelRequest`](https://tl.telethon.dev/functions/channels/leave_channel.html) via Telethon to remove the authenticated account from the specified channel. The operation is fire-and-forget — no channel data is returned on success.
+
+## Endpoint
+
+```
+DELETE /channels
+```
+
+## Authentication
+
+Requires an active Telethon session on the server.
+
+## Query Parameters
+
+<ParamField query="channel_name" type="string" required>
+  The username of the Telegram channel to leave, **without** the leading `@` (e.g. `durov`, `telegram`).
+</ParamField>
+
+## Request Body
+
+None.
+
+## Response
+
+No response body is returned on success.
+
+## Status Codes
+
+| Status              | Description |
+|---------------------|-------------|
+| `204 No Content`    | The authenticated account successfully left the channel. |
+
+## Example
+
+<CodeGroup>
+
+```bash Request
+curl -X DELETE 'http://localhost:5004/channels?channel_name=durov'
+```
+
+</CodeGroup>
+
+<Note>
+  No confirmation body is returned — a `204 No Content` response is the sole indicator that the
+  operation completed successfully. If the provided channel username does not exist or is otherwise
+  unresolvable, Telethon may raise an error internally. The current implementation does not
+  explicitly catch errors from `LeaveChannelRequest`, so unexpected failures may surface as
+  unhandled 500 responses.
+</Note>

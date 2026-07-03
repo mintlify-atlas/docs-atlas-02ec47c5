@@ -1,0 +1,89 @@
+---
+title: "Telegram Connector: Telegram REST API via Telethon"
+sidebarTitle: "Introduction"
+description: "Telegram Connector wraps Telethon with FastAPI to deliver a clean REST API for session management, channel operations, and message retrieval."
+---
+
+Telegram Connector is a lightweight FastAPI service that wraps [Telethon](https://docs.telethon.dev/) — the Python MTProto client — behind a clean REST API. Instead of writing async Telethon code directly in your application, you deploy this service once and drive it entirely over HTTP. It handles the MTProto handshake, session lifecycle, channel membership, and time-range message retrieval, so your application only needs to make standard REST calls.
+
+## Architecture
+
+The service is structured around four core concerns:
+
+**FastAPI application layer.** `src/main.py` bootstraps the app, registers three routers (authentication, channels, messages), and wires a lifespan handler that loads the Telegram session on startup and persists it on shutdown.
+
+**Telethon MTProto user client.** `TeleClient` extends `TelegramClient` and is used as an async context manager on every request. It authenticates as a regular Telegram *user* (not a bot), connects via MTProto, and disconnects cleanly when the request completes.
+
+**S3 session persistence.** `SessionManager` serialises the active Telethon `StringSession` to an S3 object (`telegram/<SESSION>/session.txt`) on startup/shutdown and after a successful sign-in. This means the container can be restarted or redeployed without re-authenticating.
+
+**FakeClient for development.** When `API_ID` is not set, the channels and messages routes transparently switch to `FakeClient` — an in-process stub that yields synthetic channels and messages. No Telegram credentials are required to work on the service locally.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Two-step Sign-in"
+    icon="mobile"
+    href="/api-reference/authentication/sign-in"
+  >
+    Authenticate as a Telegram user via a two-request flow: send your phone number, then submit the code delivered to your Telegram app.
+  </Card>
+  <Card
+    title="Channel Management"
+    icon="list"
+    href="/api-reference/channels/list-channels"
+  >
+    List all channels you are a member of, join a new channel by username, or leave an existing one — all over REST.
+  </Card>
+  <Card
+    title="Time-range Message Retrieval"
+    icon="clock"
+    href="/api-reference/messages/get-messages"
+  >
+    Fetch messages across all subscribed channels within a precise `start_time` / `end_time` window using Telethon's `iter_messages`.
+  </Card>
+  <Card
+    title="S3 Session Persistence"
+    icon="cloud"
+    href="/configuration/session-persistence"
+  >
+    Telethon sessions are serialised as `StringSession` and stored in S3, surviving container restarts without requiring re-authentication.
+  </Card>
+  <Card
+    title="FakeClient for Development"
+    icon="flask"
+    href="/deployment/development"
+  >
+    Omit `API_ID` to activate the built-in `FakeClient` stub, which streams synthetic channels and messages so you can develop without live Telegram credentials.
+  </Card>
+  <Card
+    title="Sentry Error Monitoring"
+    icon="bug"
+    href="/configuration/environment"
+  >
+    Provide a `SENTRY_DSN` to enable Sentry with the Starlette and FastAPI integrations. Traces sample rate is configurable via `SENTRY_TSR`.
+  </Card>
+</CardGroup>
+
+## Public API Surface
+
+All endpoints are served from the root path. Interactive documentation is available at `http://localhost:5004/docs` after the service is running.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Service name and description |
+| `GET` | `/is_user_authorized` | Check whether the current session is authenticated |
+| `POST` | `/sign_in` | Send phone number (step 1) or phone + code (step 2) to authenticate |
+| `GET` | `/channels` | List all channels the user belongs to |
+| `POST` | `/channels` | Join a channel by username |
+| `DELETE` | `/channels` | Leave a channel by username |
+| `GET` | `/messages` | Retrieve messages across channels within a time range |
+
+## Prerequisites
+
+- **Telegram API credentials** — an `api_id` (integer) and `api_hash` (string) obtained from [my.telegram.org/apps](https://my.telegram.org/apps).
+- **Docker** — the service is designed to be built and run as a container.
+
+<Note>
+  Telegram Connector uses the **MTProto user API**, not the Bot API. You authenticate as a real Telegram user account, which gives you access to all dialogs and message history that account can see. A bot token will not work here.
+</Note>

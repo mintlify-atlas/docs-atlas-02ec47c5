@@ -1,0 +1,94 @@
+---
+title: "Deploy Telegram Connector with Docker"
+sidebarTitle: "Docker"
+description: "Build and run the Telegram Connector production Docker image with the prod stage, configure environment variables, and manage the container lifecycle."
+---
+
+The Telegram Connector ships with a multi-stage `Dockerfile` that keeps the production image lean. The `prod` stage copies only the installed site-packages and the `uvicorn` binary from the intermediate `builder` stage — no Poetry, no dev dependencies, no build tooling. The resulting container runs as the non-root user `nova` and listens on port **5000**.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) installed and running
+- Telegram API credentials (`API_ID` and `API_HASH`) obtained from [my.telegram.org](https://my.telegram.org)
+- A `.env` file configured with all required values — see [Environment Variables](/configuration/environment)
+
+## Build the image
+
+Run the following command from the project root. Because the `prod` stage is the last stage defined in the `Dockerfile`, Docker targets it by default:
+
+```bash
+docker build -t telegram-connector .
+```
+
+## Run the container
+
+```bash
+docker run --rm --name telegram-connector -it -p 5004:5000 -v .:/app telegram-connector
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--rm` | Automatically remove the container when it exits — keeps things tidy during manual runs |
+| `--name telegram-connector` | Assign a human-readable name so you can reference the container with `docker stop`, `docker logs`, etc. |
+| `-it` | Run in interactive mode — required the **first time** you start the service so Telethon can prompt for your phone number and the sign-in code |
+| `-p 5004:5000` | Map port 5004 on the host to port 5000 inside the container |
+| `-v .:/app` | Mount the current directory into `/app` so the container can read your `.env` file and persist the Telethon session file |
+
+## Environment variable injection
+
+If you prefer not to rely on a volume mount for environment variables, pass them directly with `--env-file`:
+
+```bash
+docker run --rm --name telegram-connector -p 5004:5000 --env-file .env telegram-connector
+```
+
+This injects every key-value pair from `.env` as environment variables without mounting the file into the container filesystem.
+
+## Multi-stage build explanation
+
+The `Dockerfile` defines three stages:
+
+| Stage | Base | Purpose |
+|-------|------|---------|
+| `builder` | `python:3.10.16-slim-bullseye` | Installs Poetry 1.8.5 and all **production** dependencies (`poetry install --without dev`) |
+| `prod` | `python:3.10.16-slim-bullseye` | Copies only `/usr/local/lib/python3.10/site-packages` and the `uvicorn` binary from `builder`, then copies `src/`. Dev dependencies never touch this image. |
+| `dev` | `builder` | Extends the builder by running `poetry install` (with dev deps) and copying the full project. Used for local development with live reload. |
+
+Excluding dev dependencies from `prod` reduces the attack surface and image size. Poetry itself is also absent from the final image — only what the application needs at runtime is present.
+
+## Port reference
+
+| Port | Protocol | Description |
+|------|----------|-------------|
+| 5000 | HTTP | FastAPI application (inside the container) |
+
+## Container health
+
+The `GET /` endpoint returns a JSON payload that can be used as a lightweight healthcheck probe:
+
+```json
+{
+  "name": "Telegram connector",
+  "description": "Lightweight wrapper around Telethon built with FastAPI"
+}
+```
+
+To add an automated healthcheck, append the following instruction to your own `Dockerfile` or use `--health-*` flags on `docker run`:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:5000/ || exit 1
+```
+
+## Auto-restarts
+
+For long-running production containers, add a restart policy so the service recovers automatically after host reboots or unexpected exits:
+
+```bash
+docker run --restart unless-stopped --name telegram-connector -p 5004:5000 --env-file .env telegram-connector
+```
+
+For more complex setups — multiple services, shared networks, or managed restart policies — use **Docker Compose** and set `restart: unless-stopped` on the service definition.
+
+<Note>
+  The service starts uvicorn with `--workers 1`. Telethon sessions are backed by a single SQLite file and are **not multiprocess-safe** — running multiple workers would cause session corruption. Do not increase the worker count.
+</Note>

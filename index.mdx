@@ -1,20 +1,57 @@
 ---
-title: "Introduction"
-description: "Welcome to your project"
+title: "Telegram Connector: REST API for Telegram via Telethon"
+sidebarTitle: "Home"
+description: "Telegram Connector is a lightweight FastAPI service wrapping Telethon, giving you a clean REST API to manage sessions, channels, and messages."
 ---
 
-Write a short description of your product here. What it does, who it's for, and what they can accomplish with it.
+Telegram Connector is a self-hosted REST API that wraps [Telethon](https://docs.telethon.dev/) with [FastAPI](https://fastapi.tiangolo.com/), so you can integrate Telegram features into any application without handling the MTProto protocol directly. Sign in with your Telegram account, list and join channels, and retrieve messages by time range — all through simple HTTP calls.
 
-<Tip>
-  Ready to make this your own? Start by editing this page. Update your `docs.json` file to customize your site. Then fill out the [Quickstart](/quickstart) page.
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Build the Docker image, configure credentials, and make your first API call in minutes.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/authentication/is-user-authorized">
+    Explore every endpoint — authentication, channels, and messages — with request/response schemas.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/environment">
+    Learn about all environment variables, from Telegram API credentials to AWS S3 session storage.
+  </Card>
+  <Card title="Deployment" icon="docker" href="/deployment/docker">
+    Deploy to production with Docker or run in development mode with live reload.
+  </Card>
+</CardGroup>
 
-<Card title="Quickstart" icon="rocket" href="/quickstart">
-  This card links to the quickstart page in your project.
-</Card>
-<Card title="Components" icon="puzzle-piece" href="https://mintlify.com/docs/components">
-  Add cards, callouts, steps, tabs, and more to design and structure your pages.
-</Card>
-<Card title="Settings" icon="gear" href="https://mintlify.com/docs/organize/settings">
-  Set your site name, branding, and navigation in the `docs.json` file.
-</Card>
+## What You Can Do
+
+<CardGroup cols={3}>
+  <Card title="Authenticate" icon="key">
+    Sign in with your Telegram phone number and receive a one-time code — no bot token needed.
+  </Card>
+  <Card title="Manage Channels" icon="satellite-dish">
+    List all your Telegram channels, join new ones by username, or leave channels programmatically.
+  </Card>
+  <Card title="Fetch Messages" icon="message">
+    Retrieve messages from all subscribed channels filtered by a start and end time window.
+  </Card>
+</CardGroup>
+
+## How It Works
+
+<Steps>
+  <Step title="Obtain Telegram API credentials">
+    Register your application at [my.telegram.org](https://my.telegram.org) to get an `api_id` and `api_hash`.
+  </Step>
+  <Step title="Run the service">
+    Build and start the Docker container with your credentials. The service listens on port `5000`.
+  </Step>
+  <Step title="Sign in to your Telegram account">
+    Call `POST /sign_in` with your phone number. Telegram sends a code to your Telegram app — submit it to complete authentication.
+  </Step>
+  <Step title="Start making API calls">
+    With an active session, call `GET /channels` to list your channels or `GET /messages` to fetch messages from a time range.
+  </Step>
+</Steps>
+
+<Note>
+  Telegram Connector uses the MTProto user API (via Telethon), not the Bot API. This means you authenticate as a regular Telegram user account, giving you access to all channels and chats you're a member of.
+</Note>

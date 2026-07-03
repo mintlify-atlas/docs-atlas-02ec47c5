@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Telegram Connector",
+  "projectType": "api-service",
+  "projectName": "Telegram Connector",
+  "projectDescription": "A lightweight REST API service that wraps Telethon with FastAPI, enabling easy Telegram session management, channel operations, and message retrieval without dealing with low-level client logic.",
   "theme": "luma",
-  "colors": {
-    "primary": "#27a5e4",
-    "light": "#73c5ed"
-  },
-  "favicon": "https://media.brand.dev/40bdbb0a-a5ff-4672-a0fe-edb5d54243cf.png",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/OPENNOVA2026/telegram-connector"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/OPENNOVA2026/telegram-connector"
-    }
-  },
+  "primaryColor": "#27a5e4",
+  "lightColor": "#73c5ed",
+  "darkColor": null,
   "navigation": {
     "tabs": [
       {
@@ -73,5 +61,24 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "REST API wrapper around Telethon for Telegram MTProto integration",
+    "Two-step sign-in flow (phone code + confirmation)",
+    "Session persistence via AWS S3 (StringSession serialization)",
+    "Channel management: list, join, and leave Telegram channels",
+    "Time-range message retrieval from all subscribed channels",
+    "FakeClient for development/testing without a real Telegram account",
+    "Sentry integration for error monitoring",
+    "Docker-based deployment with multi-stage builds"
+  ],
+  "publicApiSurface": [
+    "GET /is_user_authorized",
+    "POST /sign_in",
+    "GET /channels",
+    "POST /channels",
+    "DELETE /channels",
+    "GET /messages",
+    "GET /"
+  ]
 }

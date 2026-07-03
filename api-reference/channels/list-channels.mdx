@@ -1,0 +1,130 @@
+---
+title: "GET /channels — List Telegram Channels"
+sidebarTitle: "GET /channels"
+description: "GET /channels — returns all Telegram channels in the authenticated account's dialogs. Falls back to FakeClient synthetic data when API_ID is not configured."
+---
+
+This endpoint iterates over all dialogs for the authenticated Telegram account and returns every entry that is a channel. Each item in the response is a full channel object derived from Telethon's [`Channel`](https://tl.telethon.dev/constructors/channel.html) constructor.
+
+## Endpoint
+
+```
+GET /channels
+```
+
+## Authentication
+
+Requires an active Telethon session on the server. When `API_ID` is set to `0` in the server configuration, the endpoint automatically falls back to `FakeClient` and returns synthetic data instead of making real Telegram API calls.
+
+## Request
+
+No query parameters or request body.
+
+## Response
+
+<ResponseField name="data" type="Channel[]" required>
+  Array of channel objects representing all channels found in the authenticated account's dialogs.
+
+  <Expandable title="Channel object properties">
+    <ResponseField name="id" type="integer" required>
+      Unique channel identifier assigned by Telegram.
+    </ResponseField>
+
+    <ResponseField name="title" type="string" required>
+      Display name of the channel.
+    </ResponseField>
+
+    <ResponseField name="date" type="string" required>
+      ISO 8601 datetime string representing the channel creation date (e.g. `"2023-01-15T10:00:00+00:00"`).
+    </ResponseField>
+
+    <ResponseField name="username" type="string | null">
+      Public `@username` of the channel. `null` for private channels with no public link.
+    </ResponseField>
+
+    <ResponseField name="participants_count" type="integer | null">
+      Total number of members. May be `null` if Telegram does not expose the count.
+    </ResponseField>
+
+    <ResponseField name="broadcast" type="boolean | null">
+      `true` if this is a one-way broadcast channel (only admins can post).
+    </ResponseField>
+
+    <ResponseField name="megagroup" type="boolean | null">
+      `true` if this is a supergroup (large group chat surfaced as a channel type in Telethon).
+    </ResponseField>
+
+    <ResponseField name="verified" type="boolean | null">
+      `true` if the channel carries Telegram's official verification badge.
+    </ResponseField>
+
+    <ResponseField name="scam" type="boolean | null">
+      `true` if Telegram has flagged this channel as a scam.
+    </ResponseField>
+
+    <ResponseField name="creator" type="boolean | null">
+      `true` if the currently authenticated account is the creator of this channel.
+    </ResponseField>
+
+    <ResponseField name="left" type="boolean | null">
+      `true` if the currently authenticated account has left this channel.
+    </ResponseField>
+
+    <ResponseField name="noforwards" type="boolean | null">
+      `true` if forwarding messages out of this channel is restricted.
+    </ResponseField>
+
+    <ResponseField name="forum" type="boolean | null">
+      `true` if the channel has forum/topics mode enabled.
+    </ResponseField>
+
+    All remaining fields (`restricted`, `min`, `has_link`, `has_geo`, `slowmode_enabled`,
+    `call_active`, `call_not_empty`, `fake`, `gigagroup`, `join_to_send`, `join_request`,
+    `stories_hidden`, `stories_hidden_min`, `stories_unavailable`, `signature_profiles`,
+    `access_hash`, `restriction_reason`, `admin_rights`, `banned_rights`,
+    `default_banned_rights`, `usernames`, `stories_max_id`, `color`, `profile_color`,
+    `emoji_status`, `level`, `subscription_until_date`, `bot_verification_icon`,
+    `send_paid_messages_stars`, `signatures`) map directly to the Telethon constructor
+    documented at [https://tl.telethon.dev/constructors/channel.html](https://tl.telethon.dev/constructors/channel.html).
+  </Expandable>
+</ResponseField>
+
+## Status Codes
+
+| Status   | Description                  |
+|----------|------------------------------|
+| `200 OK` | List of channels returned successfully. |
+
+## Example
+
+<CodeGroup>
+
+```bash Request
+curl http://localhost:5004/channels
+```
+
+```json Response (200 OK)
+{
+  "data": [
+    {
+      "id": 1234567890,
+      "title": "Example Channel",
+      "username": "examplechannel",
+      "date": "2023-01-15T10:00:00+00:00",
+      "broadcast": true,
+      "verified": false,
+      "participants_count": 15000,
+      "creator": false,
+      "left": false
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+<Note>
+  When `API_ID` is `0`, this endpoint returns synthetic data from `FakeClient` — 10 fake channels
+  named **"Channel 1"** through **"Channel 10"** — without making any real Telegram API calls.
+  Set a valid `API_ID` in your environment to retrieve live data.
+</Note>

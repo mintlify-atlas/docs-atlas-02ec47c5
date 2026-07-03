@@ -1,0 +1,55 @@
+---
+title: "GET /is_user_authorized — Check Telegram Auth Status"
+sidebarTitle: "GET /is_user_authorized"
+description: "GET /is_user_authorized — checks whether the current Telethon session is authenticated with Telegram. Returns a boolean data field."
+---
+
+Call this endpoint after completing the sign-in flow to confirm that authentication succeeded, or on application startup to check whether a previously persisted session is still valid. It performs no side effects — it simply interrogates the internal Telethon client and returns the current authorization state.
+
+## Endpoint
+
+```
+GET /is_user_authorized
+```
+
+## Authentication
+
+<Note>
+  No authentication is required to call this endpoint. It reflects the state of the server-side Telethon session, not a caller identity.
+</Note>
+
+## Request
+
+This endpoint accepts no request body and no query parameters.
+
+## Response
+
+<ResponseField name="data" type="boolean" required>
+  `true` if the active Telethon session is currently authorized with Telegram; `false` otherwise.
+</ResponseField>
+
+## Status Codes
+
+| Status | Description |
+|--------|-------------|
+| 200 OK | Returns authorization status |
+
+## Example Request
+
+```bash
+curl http://localhost:5004/is_user_authorized
+```
+
+## Example Responses
+
+<CodeGroup>
+
+```json Authorized
+{"data": true}
+```
+
+```json Not Authorized
+{"data": false}
+```
+
+</CodeGroup>

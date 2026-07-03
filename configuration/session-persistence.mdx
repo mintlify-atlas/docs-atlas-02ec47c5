@@ -1,0 +1,101 @@
+---
+title: "Telegram Session Persistence with AWS S3"
+sidebarTitle: "Session Persistence"
+description: "Understand how Telegram Connector serializes and stores Telethon sessions in AWS S3 so authentication survives container restarts and redeployments."
+---
+
+Telethon sessions encode the full authentication state of a Telegram client — the authorization key, server addresses, and account identity. By default, Telethon writes this state to a local SQLite file. In a containerized environment that file disappears with the container, forcing the user to re-authenticate on every restart. Telegram Connector replaces the local file strategy with an S3-backed `SessionManager` that loads session data on startup and saves it back on shutdown, keeping authentication state durable across deployments.
+
+## How it works
+
+The `SessionManager` class in `src/domain/session_manager.py` owns the full lifecycle of a Telethon `StringSession`. At boot time the FastAPI `lifespan` handler calls `session_manager.load()`; at shutdown it calls `session_manager.save()`.
+
+<Steps>
+  <Step title="Load on startup">
+    `session_manager.load()` calls `s3_client.get_object()` targeting the configured bucket and key. Three outcomes are possible:
+
+    - **Object found and non-empty** — the raw string is deserialized into a `StringSession` and stored on the manager. The Telethon client is initialized with this session and is immediately authenticated without any OTP flow.
+    - **Object empty** — a fresh `StringSession()` is created. The client will need to sign in before it can perform any operations.
+    - **`NoSuchKey` / `404` error** — the key does not exist yet (first run). A fresh `StringSession()` is created, identical to the empty case above.
+
+    Any other `ClientError` (permissions problem, unreachable bucket, etc.) is re-raised immediately, preventing a misconfigured service from starting in a broken state.
+  </Step>
+  <Step title="Persist after sign-in">
+    Once the user completes the Telegram sign-in flow via the REST API, `client.persist_session()` calls `session_manager.save()` immediately. This ensures the authenticated session is durable even if the container is replaced before a clean shutdown.
+  </Step>
+  <Step title="Save on shutdown">
+    When FastAPI's `lifespan` context exits (graceful shutdown), `session_manager.save()` serializes the current `StringSession` via `session.save()` and uploads the resulting string to S3 as UTF-8 plain text with `ContentType: text/plain`. The next startup will find this object and skip re-authentication.
+  </Step>
+</Steps>
+
+The serialization round-trip in `update_from_client` is intentional — it snapshots the session at a known point rather than holding a live reference that Telethon might mutate:
+
+```python
+def update_from_client(self, client_session: StringSession) -> None:
+    self.session = StringSession(client_session.save())
+```
+
+## S3 key structure
+
+All session objects share a predictable key layout inside the configured bucket:
+
+```
+{AWS_S3_SESSION_BUCKET}/
+└── telegram/
+    └── {SESSION}/
+        └── session.txt
+```
+
+The `SESSION` environment variable (default: `teleapp`) acts as a namespace. This means a single S3 bucket can host sessions for multiple independent connector instances — each with its own `SESSION` value — without any key collisions.
+
+**Example:** with `SESSION=production-bot` and `AWS_S3_SESSION_BUCKET=my-telegram-sessions`, the session object lives at:
+
+```
+s3://my-telegram-sessions/telegram/production-bot/session.txt
+```
+
+## Required AWS permissions
+
+The IAM principal used by the service needs only two S3 actions, scoped to the target bucket and key prefix:
+
+| Permission | When it is used |
+|---|---|
+| `s3:GetObject` | `session_manager.load()` on startup — fetching the persisted session string |
+| `s3:PutObject` | `session_manager.save()` on shutdown and after sign-in — writing the updated session string |
+
+A minimal IAM policy statement for a bucket named `my-telegram-sessions` looks like this:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "s3:GetObject",
+    "s3:PutObject"
+  ],
+  "Resource": "arn:aws:s3:::my-telegram-sessions/telegram/*"
+}
+```
+
+No `s3:ListBucket`, `s3:DeleteObject`, or other actions are required by the session manager.
+
+## Using a local S3-compatible store (MinIO)
+
+For local development or self-hosted environments you can point Telegram Connector at any S3-compatible store. MinIO is a common choice. Set the following variables in your `.env`:
+
+```env
+AWS_S3_ENDPOINT=http://localhost:9000
+AWS_ACCESS_KEY=minioadmin
+AWS_SECRET_KEY=minioadmin
+AWS_S3_SESSION_BUCKET=telegram-sessions
+AWS_REGION=us-east-1
+```
+
+The `S3Client` in `src/clients/s3_client.py` passes `endpoint_url` directly to `boto3.client()`, so any store that implements the S3 API will work as a drop-in replacement for AWS S3.
+
+<Warning>
+  If the S3 bucket is unreachable at startup and the error returned is anything other than `NoSuchKey` or `404`, `session_manager.load()` will re-raise the exception and the service will fail to start. Ensure the bucket exists, the credentials have the required permissions, and the endpoint URL is reachable from your deployment environment before running the service.
+</Warning>
+
+<Tip>
+  For local development where session persistence is not a concern, set `API_ID=0` in your `.env`. Telegram Connector will use `FakeClient` automatically, which bypasses session management entirely and returns synthetic data — no S3 bucket or Telegram credentials needed.
+</Tip>

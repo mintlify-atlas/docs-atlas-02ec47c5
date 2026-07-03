@@ -1,0 +1,89 @@
+---
+title: "Run Telegram Connector in Development Mode"
+sidebarTitle: "Development"
+description: "Start Telegram Connector locally with live reload using the dev Docker stage, and use FakeClient to test without real Telegram credentials."
+---
+
+The `dev` Docker stage uses `fastapi dev` to start the application with **live reload** enabled — any change to a source file inside the mounted project directory immediately restarts the server. Paired with `FakeClient`, you can develop and test every endpoint without a real Telegram account or API credentials.
+
+## Development Docker build
+
+Build the `dev` stage by passing `--target dev`:
+
+```bash
+docker build --target dev -t telegram-connector-dev .
+```
+
+Then run the container, mounting your project directory so that file changes are picked up by the live-reload watcher:
+
+```bash
+docker run --rm --name telegram-connector-dev -it -p 5004:5000 -v .:/app telegram-connector-dev
+```
+
+The `-v .:/app` mount is what makes live reload useful — edits you make on the host are immediately visible inside the container, and `fastapi dev` restarts the server automatically.
+
+## FakeClient — developing without Telegram credentials
+
+When `API_ID` is `0` (the default value in `Settings`), the `GET /channels` and `GET /messages` endpoints automatically fall back to `FakeClient` instead of connecting to the real Telegram API. This lets you explore and test the API without a Telegram account, phone number, or sign-in flow.
+
+**What FakeClient returns:**
+
+- **`iter_dialogs()`** — yields 10 fake channels: *Channel 1* through *Channel 10*, each with a fixed date and a username matching the title.
+- **`iter_messages()`** — yields an infinite stream of fake messages with continuously decreasing timestamps (starting one minute before `offset_date`, decrementing by 1–16 minutes per message). Each message is assigned to one of the 10 fake channels via a rotating `PeerChannel`.
+
+To activate `FakeClient`, either omit `API_ID` from your `.env` entirely, or set it explicitly to zero:
+
+```env
+API_ID=0
+```
+
+Example response from `GET /channels` in FakeClient mode:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "title": "Channel 1",
+      "username": "Channel 1",
+      "date": "2025-01-01T12:00:00+00:00"
+    }
+  ]
+}
+```
+
+<Note>
+  The `authentication` endpoints (`/sign_in`, `/is_user_authorized`) always require real Telegram credentials. They connect directly to the Telegram API and are **not** affected by the FakeClient fallback.
+</Note>
+
+## Interactive API docs
+
+When the service is running, Swagger UI is available at:
+
+```
+http://localhost:5004/docs
+```
+
+Every endpoint — channels, messages, and authentication — is listed there with request/response schemas and a built-in form to execute calls directly in the browser. This is the fastest way to explore the API during development.
+
+<Tip>
+  Use the Swagger UI at `/docs` to complete the sign-in flow. The two-step authentication process (send phone number → submit code) is much easier to follow through the interactive form than by crafting raw `curl` commands.
+</Tip>
+
+## Running tests
+
+The project uses `pytest` with `pytest-cov` and enforces a minimum of **65% code coverage**. Tests mock both `boto3` and `TeleClient` so they run without any external dependencies.
+
+```bash
+# Build the dev image first
+docker build --target dev -t telegram-connector-dev .
+
+# Run tests inside the container
+docker run --rm telegram-connector-dev pytest
+```
+
+The `pytest` configuration in `pyproject.toml` automatically enables coverage reporting and will fail the run if coverage drops below 65%:
+
+```
+--cov=src --cov-fail-under=65 --cov-report=term-missing:skip-covered
+```

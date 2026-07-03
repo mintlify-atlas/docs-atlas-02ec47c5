@@ -1,47 +1,151 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Telegram Connector"
+sidebarTitle: "Quickstart"
+description: "Learn how to build and run Telegram Connector with Docker, authenticate your Telegram account, and make your first API calls in under 10 minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+This guide walks you through obtaining Telegram API credentials, building and running the service with Docker, completing the two-step sign-in flow, and making your first channel and message requests. By the end you will have a running Telegram Connector instance, an authenticated session, and a list of your Telegram channels returned from the API.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+
+  <Step title="Obtain Telegram API credentials">
+    Navigate to [https://my.telegram.org/apps](https://my.telegram.org/apps) and log in with the phone number associated with your Telegram account. Create a new application — Telegram will issue an `api_id` (integer) and an `api_hash` (string) that identify your client to the MTProto network.
+
+    <Warning>
+      Keep your `api_hash` secret. It acts as a password for your Telegram API application — anyone who holds it can impersonate your client.
+    </Warning>
+  </Step>
+
+  <Step title="Create your .env file">
+    In the root of the project, create a `.env` file with your credentials:
+
+    ```env
+    API_ID=12345678
+    API_HASH=your_api_hash_here
+    ```
+
+    Three additional optional variables are supported: `ENVIRONMENT` (defaults to `local`), `SESSION` (the logical name used for the S3 session key, defaults to `teleapp`), and `SENTRY_DSN` (enables Sentry error monitoring when set). See [Configuration → Environment](/configuration/environment) for the full reference.
+  </Step>
+
+  <Step title="Build the Docker image">
+    From the project root, build the production image:
 
     ```bash
-    npm install your-package
+    docker build -t telegram-connector .
     ```
+
+    The Dockerfile uses a multi-stage build: a `builder` stage installs dependencies with Poetry, and the `prod` stage copies only the installed packages and application source into a minimal `python:3.10.16-slim-bullseye` image.
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Run the container">
+    Start the container with the environment file and a volume mount:
 
     ```bash
-    your-cli init
+    docker run --rm --name telegram-connector -it -p 5004:5000 -v .:/app telegram-connector
     ```
+
+    - `-p 5004:5000` maps port **5004** on your host to the container's internal port **5000**, where Uvicorn is listening.
+    - `-v .:/app` mounts your project directory into the container so that your `.env` file is picked up at runtime.
+
+    The service starts and immediately tries to load an existing session from S3. If no session exists yet it initialises a fresh `StringSession` and waits for sign-in.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Sign in — send your phone number">
+    POST to `/sign_in` with only your phone number (in E.164 format):
 
     ```bash
-    your-cli start
+    curl -X POST http://localhost:5004/sign_in \
+      -H 'Content-Type: application/json' \
+      -d '{"phone": "+1234567890"}'
     ```
+
+    The service returns **HTTP 206 Partial Content**. This means Telegram has dispatched a one-time code to your Telegram app (or via SMS). Do not include a `password` field in this first request.
   </Step>
+
+  <Step title="Sign in — submit the code">
+    Open your Telegram app, note the code you received, and send it as the `password` field:
+
+    ```bash
+    curl -X POST http://localhost:5004/sign_in \
+      -H 'Content-Type: application/json' \
+      -d '{"phone": "+1234567890", "password": "12345"}'
+    ```
+
+    The `password` field carries the code Telegram sent to your app — it is not your account password. A successful authentication returns **HTTP 200** and the session is immediately persisted to S3 via `SessionManager`.
+  </Step>
+
+  <Step title="Verify authorization">
+    Confirm the session is active:
+
+    ```bash
+    curl http://localhost:5004/is_user_authorized
+    ```
+
+    Expected response:
+
+    ```json
+    {"data": true}
+    ```
+
+    If this returns `false`, repeat the sign-in steps — the session was not established correctly.
+  </Step>
+
+  <Step title="List your channels">
+    Fetch all channels the authenticated user belongs to:
+
+    ```bash
+    curl http://localhost:5004/channels
+    ```
+
+    Example response (trimmed to one channel):
+
+    ```json
+    {
+      "data": [
+        {
+          "id": 1234567890,
+          "title": "Example Channel",
+          "username": "example_channel",
+          "participants_count": 4821
+        }
+      ]
+    }
+    ```
+
+    Each object in `data` is the raw Telethon `Channel` dict. You can use the `username` values here as identifiers when joining or leaving channels via `POST /channels` and `DELETE /channels`.
+  </Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next Steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/authentication/is-user-authorized"
+  >
+    Explore full request and response schemas for every endpoint, including sign-in, channel management, and message retrieval.
+  </Card>
+  <Card
+    title="Configuration"
+    icon="sliders"
+    href="/configuration/environment"
+  >
+    Review all environment variables — AWS credentials, Sentry DSN, session name, and more.
+  </Card>
+  <Card
+    title="Session Persistence"
+    icon="cloud"
+    href="/configuration/session-persistence"
+  >
+    Understand how Telethon StringSessions are serialised and stored in S3 so your authentication survives container restarts.
+  </Card>
+  <Card
+    title="Deployment"
+    icon="rocket"
+    href="/deployment/docker"
+  >
+    Learn about the production and development Docker targets, environment-specific configuration, and container best practices.
+  </Card>
+</CardGroup>

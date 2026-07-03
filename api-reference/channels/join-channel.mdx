@@ -1,0 +1,135 @@
+---
+title: "POST /channels — Join a Telegram Channel"
+sidebarTitle: "POST /channels"
+description: "POST /channels — joins a public Telegram channel by username using JoinChannelRequest and returns the full channel object on success."
+---
+
+This endpoint sends a [`JoinChannelRequest`](https://tl.telethon.dev/functions/channels/join_channel.html) via Telethon to add the authenticated account to the specified public channel. On success it returns the full channel object for the channel that was just joined.
+
+## Endpoint
+
+```
+POST /channels
+```
+
+## Authentication
+
+Requires an active Telethon session on the server. Unlike `GET /channels`, this endpoint **always** uses the real Telegram client — `FakeClient` is never used regardless of the `API_ID` setting.
+
+## Query Parameters
+
+<ParamField query="channel_name" type="string" required>
+  The public username of the Telegram channel to join, **without** the leading `@` (e.g. `durov`, `telegram`). Must resolve to a valid, accessible public channel.
+</ParamField>
+
+## Request Body
+
+None.
+
+## Response
+
+<ResponseField name="data" type="Channel" required>
+  The full channel object for the channel that was joined.
+
+  <Expandable title="Channel object properties">
+    <ResponseField name="id" type="integer" required>
+      Unique channel identifier assigned by Telegram.
+    </ResponseField>
+
+    <ResponseField name="title" type="string" required>
+      Display name of the channel.
+    </ResponseField>
+
+    <ResponseField name="date" type="string" required>
+      ISO 8601 datetime string representing the channel creation date.
+    </ResponseField>
+
+    <ResponseField name="username" type="string | null">
+      Public `@username` of the channel.
+    </ResponseField>
+
+    <ResponseField name="participants_count" type="integer | null">
+      Total number of members. May be `null` if Telegram does not expose the count.
+    </ResponseField>
+
+    <ResponseField name="broadcast" type="boolean | null">
+      `true` if this is a one-way broadcast channel.
+    </ResponseField>
+
+    <ResponseField name="megagroup" type="boolean | null">
+      `true` if this is a supergroup.
+    </ResponseField>
+
+    <ResponseField name="verified" type="boolean | null">
+      `true` if the channel carries Telegram's official verification badge.
+    </ResponseField>
+
+    <ResponseField name="scam" type="boolean | null">
+      `true` if Telegram has flagged this channel as a scam.
+    </ResponseField>
+
+    <ResponseField name="creator" type="boolean | null">
+      `true` if the currently authenticated account is the creator of this channel.
+    </ResponseField>
+
+    <ResponseField name="left" type="boolean | null">
+      `true` if the currently authenticated account has left this channel.
+    </ResponseField>
+
+    <ResponseField name="noforwards" type="boolean | null">
+      `true` if forwarding messages out of this channel is restricted.
+    </ResponseField>
+
+    <ResponseField name="forum" type="boolean | null">
+      `true` if the channel has forum/topics mode enabled.
+    </ResponseField>
+
+    All remaining fields map directly to the Telethon constructor documented at
+    [https://tl.telethon.dev/constructors/channel.html](https://tl.telethon.dev/constructors/channel.html).
+  </Expandable>
+</ResponseField>
+
+## Status Codes
+
+| Status                  | Description |
+|-------------------------|-------------|
+| `201 Created`           | The authenticated account successfully joined the channel. The full channel object is returned. |
+| `400 Bad Request`       | The channel username was not found or is invalid. Raised from a `ValueError` returned by Telethon. |
+| `429 Too Many Requests` | Telegram's flood-wait protection was triggered. The `detail` field contains the number of seconds to wait before retrying. |
+
+## Examples
+
+<CodeGroup>
+
+```bash Request
+curl -X POST 'http://localhost:5004/channels?channel_name=durov'
+```
+
+```json Response (201 Created)
+{
+  "data": {
+    "id": 476229140,
+    "title": "Durov's Channel",
+    "username": "durov",
+    "date": "2014-10-19T10:00:00+00:00",
+    "broadcast": true,
+    "verified": true,
+    "participants_count": 25000000
+  }
+}
+```
+
+```json Response (400 Bad Request)
+{
+  "detail": "No user has \"invalid_channel\" as username"
+}
+```
+
+</CodeGroup>
+
+<Warning>
+  Telegram enforces strict rate limits on join operations. If you receive a `429 Too Many Requests`
+  response, inspect the `detail` field — it contains the number of seconds you must wait before
+  issuing another join request. Repeated violations can result in longer temporary bans from the
+  Telegram API.
+</Warning>

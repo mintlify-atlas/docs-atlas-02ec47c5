@@ -1,0 +1,126 @@
+---
+title: "Environment Variables Reference for Telegram Connector"
+sidebarTitle: "Environment Variables"
+description: "Complete reference for all environment variables used to configure Telegram Connector, including Telegram API credentials, AWS S3 session storage, and Sentry monitoring."
+---
+
+Telegram Connector is configured entirely through environment variables. At startup, [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) reads values from the process environment or a `.env` file in the working directory and populates the `Settings` class defined in `src/settings.py`. The resulting singleton — `settings` — is imported throughout the codebase wherever configuration values are needed. No configuration files beyond `.env` are required.
+
+## Sample `.env` file
+
+Copy the block below as a starting point. Required fields are marked in the comments; everything else has a sensible default.
+
+```env
+# Telegram API credentials (required)
+API_ID=12345678
+API_HASH=your_api_hash_here
+
+# Application settings
+ENVIRONMENT=production
+SESSION=teleapp
+
+# AWS S3 session persistence
+AWS_REGION=us-east-1
+AWS_S3_ENDPOINT=https://s3.amazonaws.com
+AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS_S3_SESSION_BUCKET=my-telegram-sessions-bucket
+
+# Sentry error monitoring (optional)
+SENTRY_DSN=https://example@sentry.io/123
+SENTRY_TSR=1.0
+```
+
+## Variable reference
+
+### Application
+
+<ParamField query="NAME" type="string" default="Telegram connector">
+  Human-readable application name surfaced in the auto-generated FastAPI `/docs` and `/redoc` pages. Override to distinguish multiple deployments in the Swagger UI title.
+</ParamField>
+
+<ParamField query="DESCRIPTION" type="string" default="Lightweight wrapper around Telethon built with FastAPI">
+  Short description shown beneath the title in FastAPI's interactive documentation. Populated directly from `settings.description` when the `FastAPI()` instance is created.
+</ParamField>
+
+<ParamField query="ENVIRONMENT" type="string" default="local">
+  Deployment environment label (e.g. `local`, `staging`, `production`). Passed to Sentry as the `environment` tag so errors are grouped by environment in the Sentry dashboard. Has no effect on runtime behaviour beyond that.
+</ParamField>
+
+<ParamField query="SESSION" type="string" default="teleapp">
+  Session name used as the S3 key prefix when persisting Telethon session data. The full S3 object key becomes `telegram/{SESSION}/session.txt`. Running multiple connectors pointing at the same bucket with distinct `SESSION` values keeps their authentication state isolated. See [Session Persistence](/configuration/session-persistence) for details.
+</ParamField>
+
+---
+
+### Telegram API credentials
+
+<ParamField query="API_ID" type="integer" default="0">
+  Telegram API ID issued by [my.telegram.org](https://my.telegram.org). Required for any real Telegram operations — channel listing, message retrieval, and authentication all depend on this value being set to a non-zero integer.
+</ParamField>
+
+<ParamField query="API_HASH" type="string" default='""'>
+  Telegram API hash paired with `API_ID`, also obtained from [my.telegram.org](https://my.telegram.org). Must be set alongside `API_ID` to authenticate with Telegram's MTProto API.
+</ParamField>
+
+<Note>
+  When `API_ID` is `0` (the default), channel listing and message retrieval endpoints automatically fall back to `FakeClient`, which returns synthetic data without touching the Telegram network. This is the recommended setup for local development when you do not yet have API credentials.
+</Note>
+
+---
+
+### AWS S3 session storage
+
+<ParamField query="AWS_REGION" type="string" default='""'>
+  AWS region passed to the `boto3` S3 client (e.g. `us-east-1`). Can be omitted when using a region-agnostic S3-compatible endpoint such as MinIO.
+</ParamField>
+
+<ParamField query="AWS_S3_ENDPOINT" type="string" default='""'>
+  Full endpoint URL for the S3 client (e.g. `https://s3.amazonaws.com` or `http://localhost:9000` for MinIO). When left empty, `boto3` resolves the endpoint from the standard AWS SDK rules using `AWS_REGION`.
+</ParamField>
+
+<ParamField query="AWS_ACCESS_KEY" type="string" default='""'>
+  AWS access key ID used to authenticate S3 requests. If left empty, `boto3` falls back to its standard credential chain (environment variables, IAM role, `~/.aws/credentials`, etc.).
+</ParamField>
+
+<ParamField query="AWS_SECRET_KEY" type="string" default='""'>
+  AWS secret access key paired with `AWS_ACCESS_KEY`. Same fallback behaviour applies when left empty.
+</ParamField>
+
+<ParamField query="AWS_S3_SESSION_BUCKET" type="string" default="nova-persistent-sessions-bucket">
+  Name of the S3 bucket where serialized Telethon session files are stored. The bucket must exist and the configured credentials must have `s3:GetObject` and `s3:PutObject` permissions on it before the service starts.
+</ParamField>
+
+---
+
+### Sentry error monitoring
+
+<ParamField query="SENTRY_DSN" type="string" default='""'>
+  Data Source Name (DSN) for your Sentry project. When this variable is empty or unset, Sentry is completely disabled — no SDK initialization occurs and no data is sent. Set this to activate error and performance monitoring in non-local environments.
+</ParamField>
+
+<ParamField query="SENTRY_TSR" type="float" default="1.0">
+  Sentry traces sample rate, expressed as a fraction between `0.0` and `1.0`. `1.0` means every transaction is captured; `0.1` means 10 % are sampled. Lower this in high-traffic production deployments to control Sentry quota usage.
+</ParamField>
+
+---
+
+## Sentry integration
+
+Sentry is initialized by `initialize_sentry()` in `src/settings.py`, which is called once during application startup. The function is a no-op when `SENTRY_DSN` is empty, so there is no penalty for leaving it unset in development.
+
+When a DSN is provided, the SDK is configured with both the **Starlette** and **FastAPI** integrations, enabling automatic breadcrumb and transaction capture for every HTTP request handled by the application:
+
+```python
+sentry_sdk.init(
+    dsn=settings.sentry_dsn,
+    environment=settings.environment,
+    traces_sample_rate=settings.sentry_tsr,
+    integrations=[
+        StarletteIntegration(),
+        FastApiIntegration(),
+    ],
+)
+```
+
+The `ENVIRONMENT` variable is forwarded as the Sentry environment tag, making it straightforward to filter issues by deployment stage in the Sentry UI.

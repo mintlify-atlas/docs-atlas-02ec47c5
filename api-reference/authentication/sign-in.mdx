@@ -1,0 +1,76 @@
+---
+title: "POST /sign_in — Authenticate with Telegram"
+sidebarTitle: "POST /sign_in"
+description: "POST /sign_in — initiates or completes the two-step Telegram MTProto sign-in flow. Step 1 sends a code; step 2 submits the code to authenticate."
+---
+
+Telegram's MTProto authentication requires a phone number paired with a one-time confirmation code. This endpoint handles both steps of that flow: the first call triggers Telegram to deliver a confirmation code to your Telegram app; the second call submits that code to complete authentication. Once sign-in succeeds, the Telethon session is persisted to S3 so that future requests resume the authorized session without re-authenticating.
+
+## Endpoint
+
+```
+POST /sign_in
+```
+
+## How the Two-Step Flow Works
+
+<Steps>
+  <Step title="Step 1 — Request the confirmation code">
+    Send a request body containing only `phone` (omit `password`). The server calls `client.sign_in(phone)`, stores the returned `phone_code_hash` internally, and returns **HTTP 206 Partial Content**. Telegram immediately sends a confirmation code to the Telegram app associated with that phone number.
+  </Step>
+  <Step title="Step 2 — Submit the confirmation code">
+    Send a second request with both `phone` and `password` set to the one-time code you received in your Telegram app. The server calls `client.sign_in(phone, password, phone_code_hash=...)`, persists the authenticated session to S3, and returns **HTTP 200 OK**.
+  </Step>
+  <Step title="Already authorized">
+    If the Telethon session is already authorized when the endpoint is called, the server skips the sign-in logic entirely and returns **HTTP 200 OK** with no body.
+  </Step>
+</Steps>
+
+## Request Body
+
+<ParamField body="phone" type="string" required>
+  Your Telegram account phone number in international format (e.g., `+1234567890`). Required for both step 1 and step 2.
+</ParamField>
+
+<ParamField body="password" type="string">
+  The one-time confirmation code sent by Telegram to your app. Omit this field in step 1 to trigger the code to be sent. Provide it in step 2 to complete authentication.
+</ParamField>
+
+## Response
+
+There is no response body on success. The HTTP status code alone signals which stage was reached.
+
+## Status Codes
+
+| Status | Description |
+|--------|-------------|
+| 200 OK | Sign-in complete, or already authorized |
+| 206 Partial Content | Code sent to Telegram app; submit code in step 2 |
+
+## Example — Step 1: Request the Code
+
+```bash
+curl -X POST http://localhost:5004/sign_in \
+  -H 'Content-Type: application/json' \
+  -d '{"phone": "+1234567890"}'
+```
+
+Response: HTTP 206, no body.
+
+## Example — Step 2: Submit the Code
+
+```bash
+curl -X POST http://localhost:5004/sign_in \
+  -H 'Content-Type: application/json' \
+  -d '{"phone": "+1234567890", "password": "12345"}'
+```
+
+Response: HTTP 200, no body.
+
+<Warning>
+  The `phone_code_hash` returned by Telegram in step 1 is stored in a module-level global variable in the current implementation. The sign-in flow must be completed — step 1 followed by step 2 — within the same running server process. Restarting the server between the two steps will discard the hash and require you to restart the flow from step 1.
+</Warning>
+
+<Tip>
+  Use the Swagger UI at `http://localhost:5004/docs` to run through the sign-in flow interactively. It lets you send both requests directly from your browser without constructing curl commands manually.
+</Tip>
