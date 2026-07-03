@@ -1,7 +1,7 @@
 ---
 title: "Environment Variables Reference for Telegram Connector"
 sidebarTitle: "Environment Variables"
-description: "Complete reference for all environment variables used to configure Telegram Connector, including Telegram API credentials, AWS S3 session storage, and Sentry monitoring."
+description: "Complete reference for all Telegram Connector environment variables, covering API credentials, AWS S3 session storage, and Sentry monitoring."
 ---
 
 Telegram Connector is configured entirely through environment variables. At startup, [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) reads values from the process environment or a `.env` file in the working directory and populates the `Settings` class defined in `src/settings.py`. The resulting singleton — `settings` — is imported throughout the codebase wherever configuration values are needed. No configuration files beyond `.env` are required.
@@ -76,7 +76,7 @@ SENTRY_TSR=1.0
 </ParamField>
 
 <ParamField query="AWS_S3_ENDPOINT" type="string" default='""'>
-  Full endpoint URL for the S3 client (e.g. `https://s3.amazonaws.com` or `http://localhost:9000` for MinIO). When left empty, `boto3` resolves the endpoint from the standard AWS SDK rules using `AWS_REGION`.
+  Full endpoint URL passed directly to `boto3.client()` via `endpoint_url` (e.g. `https://s3.amazonaws.com` or `http://localhost:9000` for MinIO). This value is always forwarded to the boto3 S3 client — when left empty, boto3 falls back to its default AWS endpoint resolution using `AWS_REGION`.
 </ParamField>
 
 <ParamField query="AWS_ACCESS_KEY" type="string" default='""'>

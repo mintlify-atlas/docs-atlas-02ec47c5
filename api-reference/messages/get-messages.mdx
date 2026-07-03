@@ -1,5 +1,5 @@
 ---
-title: "GET /messages — Retrieve Messages by Time Range"
+title: "GET /messages — Retrieve Channel Messages by Time Range"
 sidebarTitle: "GET /messages"
 description: "GET /messages — retrieves messages from all subscribed Telegram channels within a specified time range. Filters out service messages and direct messages."
 ---
@@ -159,6 +159,11 @@ curl 'http://localhost:5004/messages?start_time=2025-01-01T00:00:00Z&end_time=20
 
 <Note>
   When `API_ID=0`, the server uses `FakeClient` instead of a real Telethon session. `FakeClient` generates an **infinite stream** of synthetic messages and only stops when the loop encounters a message whose `date` falls at or before `start_time`. Always provide a `start_time` that is close to `end_time` (e.g., within a few minutes) in FakeClient mode to prevent the loop from running indefinitely.
+
+  In FakeClient mode, `meta.channel_name` values are `"Channel 1"` through `"Channel 10"` — these are raw string identifiers, not valid `@username` handles. Message text is randomly drawn from three fixed strings:
+  - `"FAKE: I'm on vacations next week! Can't wait!"`
+  - `"FAKE: Burned myself yesterday, but love correfocs"`
+  - `"FAKE: To speak my truth, I love pizza over any other meal"`
 </Note>
 
 <Tip>

@@ -1,7 +1,7 @@
 ---
-title: "DELETE /channels — Leave a Telegram Channel"
+title: "DELETE /channels — Leave a Telegram Channel by Name"
 sidebarTitle: "DELETE /channels"
-description: "DELETE /channels — leaves a Telegram channel by username using LeaveChannelRequest. Returns 204 No Content on success."
+description: "DELETE /channels removes the authenticated Telegram account from a channel using LeaveChannelRequest. Returns 204 No Content with no response body."
 ---
 
 This endpoint sends a [`LeaveChannelRequest`](https://tl.telethon.dev/functions/channels/leave_channel.html) via Telethon to remove the authenticated account from the specified channel. The operation is fire-and-forget — no channel data is returned on success.

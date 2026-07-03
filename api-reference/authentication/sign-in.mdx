@@ -1,6 +1,6 @@
 ---
-title: "POST /sign_in — Authenticate with Telegram"
-sidebarTitle: "POST /sign_in"
+title: "POST /sign_in — Two-Step Telegram Authentication"
+sidebarTitle: "Sign In"
 description: "POST /sign_in — initiates or completes the two-step Telegram MTProto sign-in flow. Step 1 sends a code; step 2 submits the code to authenticate."
 ---
 
@@ -50,7 +50,7 @@ There is no response body on success. The HTTP status code alone signals which s
 ## Example — Step 1: Request the Code
 
 ```bash
-curl -X POST http://localhost:5004/sign_in \
+curl -X POST http://localhost:5000/sign_in \
   -H 'Content-Type: application/json' \
   -d '{"phone": "+1234567890"}'
 ```
@@ -60,7 +60,7 @@ Response: HTTP 206, no body.
 ## Example — Step 2: Submit the Code
 
 ```bash
-curl -X POST http://localhost:5004/sign_in \
+curl -X POST http://localhost:5000/sign_in \
   -H 'Content-Type: application/json' \
   -d '{"phone": "+1234567890", "password": "12345"}'
 ```
@@ -72,5 +72,5 @@ Response: HTTP 200, no body.
 </Warning>
 
 <Tip>
-  Use the Swagger UI at `http://localhost:5004/docs` to run through the sign-in flow interactively. It lets you send both requests directly from your browser without constructing curl commands manually.
+  Use the Swagger UI at `http://localhost:5000/docs` to run through the sign-in flow interactively. It lets you send both requests directly from your browser without constructing curl commands manually.
 </Tip>

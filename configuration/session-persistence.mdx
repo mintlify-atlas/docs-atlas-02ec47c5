@@ -1,5 +1,5 @@
 ---
-title: "Telegram Session Persistence with AWS S3"
+title: "Telegram Connector Session Persistence with AWS S3"
 sidebarTitle: "Session Persistence"
 description: "Understand how Telegram Connector serializes and stores Telethon sessions in AWS S3 so authentication survives container restarts and redeployments."
 ---
@@ -21,7 +21,7 @@ The `SessionManager` class in `src/domain/session_manager.py` owns the full life
     Any other `ClientError` (permissions problem, unreachable bucket, etc.) is re-raised immediately, preventing a misconfigured service from starting in a broken state.
   </Step>
   <Step title="Persist after sign-in">
-    Once the user completes the Telegram sign-in flow via the REST API, `client.persist_session()` calls `session_manager.save()` immediately. This ensures the authenticated session is durable even if the container is replaced before a clean shutdown.
+    Once the user completes the Telegram sign-in flow via the REST API, `client.persist_session()` first calls `session_manager.update_from_client(self.session)` — which snapshots the live Telethon session into a fresh `StringSession` — and then immediately calls `session_manager.save()` to write it to S3. This ensures the authenticated session is durable even if the container is replaced before a clean shutdown.
   </Step>
   <Step title="Save on shutdown">
     When FastAPI's `lifespan` context exits (graceful shutdown), `session_manager.save()` serializes the current `StringSession` via `session.save()` and uploads the resulting string to S3 as UTF-8 plain text with `ContentType: text/plain`. The next startup will find this object and skip re-authentication.

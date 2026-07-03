@@ -1,5 +1,5 @@
 ---
-title: "Get Started with Telegram Connector"
+title: "Quickstart: Run and Authenticate Telegram Connector"
 sidebarTitle: "Quickstart"
 description: "Learn how to build and run Telegram Connector with Docker, authenticate your Telegram account, and make your first API calls in under 10 minutes."
 ---
@@ -17,14 +17,33 @@ This guide walks you through obtaining Telegram API credentials, building and ru
   </Step>
 
   <Step title="Create your .env file">
-    In the root of the project, create a `.env` file with your credentials:
+    In the root of the project, create a `.env` file with your credentials and S3 session storage configuration:
 
     ```env
+    # Telegram API credentials (required)
     API_ID=12345678
     API_HASH=your_api_hash_here
+
+    # AWS S3 — required for session persistence
+    AWS_REGION=us-east-1
+    AWS_ACCESS_KEY=your_access_key_id
+    AWS_SECRET_KEY=your_secret_access_key
+    AWS_S3_SESSION_BUCKET=nova-persistent-sessions-bucket
+
+    # Optional: override the S3 endpoint (e.g. for LocalStack)
+    # AWS_S3_ENDPOINT=http://localhost:4566
+
+    # Optional: logical name used in the S3 key path (defaults to teleapp)
+    # SESSION=teleapp
+
+    # Optional: deployment environment label (defaults to local)
+    # ENVIRONMENT=local
+
+    # Optional: enable Sentry error monitoring
+    # SENTRY_DSN=https://your-dsn@sentry.io/123
     ```
 
-    Three additional optional variables are supported: `ENVIRONMENT` (defaults to `local`), `SESSION` (the logical name used for the S3 session key, defaults to `teleapp`), and `SENTRY_DSN` (enables Sentry error monitoring when set). See [Configuration → Environment](/configuration/environment) for the full reference.
+    The service calls S3 on every startup and shutdown to load and persist the Telethon session. The AWS credentials are therefore required for the service to start successfully. See [Configuration → Environment](/configuration/environment) for the full variable reference.
   </Step>
 
   <Step title="Build the Docker image">

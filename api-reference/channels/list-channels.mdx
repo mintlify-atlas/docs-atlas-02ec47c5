@@ -1,7 +1,7 @@
 ---
-title: "GET /channels — List Telegram Channels"
+title: "GET /channels — List All Subscribed Telegram Channels"
 sidebarTitle: "GET /channels"
-description: "GET /channels — returns all Telegram channels in the authenticated account's dialogs. Falls back to FakeClient synthetic data when API_ID is not configured."
+description: "Returns all Telegram channels from the authenticated account's dialogs. Falls back to FakeClient synthetic data when API_ID is not configured."
 ---
 
 This endpoint iterates over all dialogs for the authenticated Telegram account and returns every entry that is a channel. Each item in the response is a full channel object derived from Telethon's [`Channel`](https://tl.telethon.dev/constructors/channel.html) constructor.
